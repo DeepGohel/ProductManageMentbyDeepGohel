@@ -1,8 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from . import models, auth, schema
-from .database import get_db, engine
-# import csv
+from .database import get_db, engine, Session as session
 import pandas as pd
 
 app = FastAPI(title="SIMPROSYS PROJECT")
@@ -81,4 +80,27 @@ def download_csv(db:Session=Depends(get_db), token:str=Depends(auth.validate_tok
     except:
         return {"message" : "Error while creating CSV"}
 
+def create_dummy_product(product_id : int, no_of_copies : int):
+    
+    db = session()
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    for _ in range(no_of_copies):
+        dummy_product = models.Product(
+        title = product.title,
+        description = product.description,
+        price = product.price,
+        status = product.status,
+        category_id = product.category_id
+        )
+
+        db.add(dummy_product)
+        db.commit()
+
+@app.post("/add_dummy_product/{product_id}")
+def add_dummy(background_tasks:BackgroundTasks, product_id : int, no_of_copies : int, token:str=Depends(auth.validate_token)):
+    try:
+        background_tasks.add_task(create_dummy_product, product_id, no_of_copies)
+        return {"message" : "Your request has been accepted and processing..."}
+    except:
+        raise HTTPException(status_code=400, detail="There is some issue in createing dummy products")
 
